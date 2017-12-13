@@ -1,16 +1,16 @@
 package main
 
 import (
-	"os"
-	"fmt"
+	"errors"
 	"flag"
+	"fmt"
+	"github.com/rwcarlsen/goexif/exif"
+	"io"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"time"
-	"errors"
-	"io"
-	"github.com/rwcarlsen/goexif/exif"
 )
 
 const (
