@@ -1,6 +1,6 @@
 #!/bin/bash
 export GOARCH=amd64
-fn="${1:-build}"
+fn="${1:-tsrename}"
 filename=$(basename "$fn")
 extension="${filename##*.}"
 filename="${filename%.*}"
