@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/rwcarlsen/goexif/exif"
-	"github.com/rwcarlsen/goexif/tiff"
 	"io"
 	"io/ioutil"
 	"os"
@@ -33,8 +32,12 @@ var (
 
 var /* const */ tsRegex = regexp.MustCompile(tsRegexPattern)
 
-func Printfln(format string, a ...interface{}) (n int, err error) {
+func ERRLOG(format string, a ...interface{}) (n int, err error) {
 	return fmt.Fprintf(os.Stderr, format+"\n", a...)
+}
+
+func OUTPUT(a ...interface{}) (n int, err error) {
+	return fmt.Fprintln(os.Stdout, a...)
 }
 
 func moveFilebyCopy(src, dst string) error {
@@ -89,10 +92,10 @@ func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
 
 		byt, err := ioutil.ReadFile(thisFile + ".json")
 		if err != nil {
-			Printfln("[json] cant read file %s", err)
+			ERRLOG("[json] cant read file %s", err)
 		}
 		if err := json.Unmarshal(byt, &eData); err != nil {
-			Printfln("[json] can't unmarshal %s", err)
+			ERRLOG("[json] can't unmarshal %s", err)
 		}
 
 		datetimeString = eData.DateTime
@@ -121,7 +124,7 @@ func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
 		}
 	}
 	if datetime, err = parseExifDatetime(datetimeString); err != nil {
-		Printfln("[parse] parse datetime %s", err)
+		ERRLOG("[parse] parse datetime %s", err)
 	}
 	return
 }
@@ -172,7 +175,7 @@ func moveOrRename(source, dest string) error {
 		err = moveFilebyCopy(source, dest)
 	}
 	if err != nil {
-		Printfln("[move] %s", err)
+		ERRLOG("[move] %s", err)
 		return nil
 	}
 	return err
@@ -190,60 +193,62 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	// parse the new filepath
 	newPath, err := parseFilename(filePath)
 	if err != nil {
-		Printfln("[parse] %s", err)
+		ERRLOG("[parse] %s", err)
 		return nil
 	}
 
 	// make directories
 	err = os.MkdirAll(path.Dir(newPath), 0755)
 	if err != nil {
-		Printfln("[mkdir] %s", err)
+		ERRLOG("[mkdir] %s", err)
 		return nil
 	}
 
 	absSrc, _ := filepath.Abs(filePath)
-	absDest, _ := filepath.Abs(newPath)
+	absDest, absErr := filepath.Abs(newPath)
 	if absSrc == absDest {
-		Printfln("[dupe] %s", newPath)
+		ERRLOG("[dupe] %s", absDest)
 		return nil
 	}
 
-	err = moveOrRename(filePath, newPath)
+	err = moveOrRename(filePath, absDest)
 	jsFile := filePath + ".json"
 	if _, ferr := os.Stat(jsFile); ferr == nil {
 		jsDest, _ := filepath.Abs(newPath + ".json")
 		if e := moveOrRename(jsFile, jsDest); e != nil {
-			Printfln("[exif] couldn't move json exif file")
+			ERRLOG("[exif] couldn't move json exif file")
 		}
 	}
-	if err == nil {
-		fmt.Println(newPath)
+	if absErr == nil {
+		OUTPUT(absDest)
+	} else {
+		OUTPUT(newPath)
 	}
 	return err
 }
 
 var usage = func() {
-	fmt.Fprintf(os.Stderr, "usage of %s:\n", os.Args[0])
-	fmt.Fprintf(os.Stderr, "\tcopy into structure:\n")
-	fmt.Fprintf(os.Stderr, "\t\t %s <source>\n", os.Args[0])
-	fmt.Fprintf(os.Stderr, "\tcopy into structure at <destination>:\n")
-	fmt.Fprintf(os.Stderr, "\t\t %s <source> -output=<destination>\n", os.Args[0])
-	fmt.Fprintf(os.Stderr, "\tcopy into structure with <name> prefix:\n")
-	fmt.Fprintf(os.Stderr, "\t\t %s <source> -name=<name>\n", os.Args[0])
-	fmt.Fprintf(os.Stderr, "\trename (move) into structure:\n")
-	fmt.Fprintf(os.Stderr, "\t\t %s <source> -del\n", os.Args[0])
+	ERRLOG("usage of %s:", os.Args[0])
+	ERRLOG("\tcopy into structure:")
+	ERRLOG("\t\t %s <source>", os.Args[0])
+	ERRLOG("\tcopy into structure at <destination>:")
+	ERRLOG("\t\t %s <source> -output=<destination>", os.Args[0])
+	ERRLOG("\tcopy into structure with <name> prefix:")
+	ERRLOG("\t\t %s <source> -name=<name>", os.Args[0])
+	ERRLOG("\trename (move) into structure:")
+	ERRLOG("\t\t %s <source> -del", os.Args[0])
 
-	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintf(os.Stderr, "flags:\n")
-	fmt.Fprintf(os.Stderr, "\t-del: removes the source files\n")
-	fmt.Fprintf(os.Stderr, "\t-name: renames the prefix fo the target files\n")
-	fmt.Fprintf(os.Stderr, "\t-exif: uses exif data to rename rather than file timestamp\n")
+	ERRLOG("")
+	ERRLOG("flags:")
+	ERRLOG("\t-del: removes the source files")
+	ERRLOG("\t-name: renames the prefix fo the target files")
+	ERRLOG("\t-exif: uses exif data to rename rather than file timestamp")
 	pwd, _ := os.Getwd()
-	fmt.Fprintf(os.Stderr, "\t-output: set the <destination> directory (default=%s)\n", pwd)
-	fmt.Fprintf(os.Stderr, "\t-source: set the <source> directory (optional, default=stdin)\n", pwd)
-	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "reads filepaths from stdin")
-	fmt.Fprintln(os.Stderr, "will ignore any line from stdin that isnt a filepath (and only a filepath)")
+	ERRLOG("\t-output: set the <destination> directory (default=%s)", pwd)
+	ERRLOG("\t-source: set the <source> directory (optional, default=stdin)", pwd)
+	ERRLOG("")
+	ERRLOG("reads filepaths from stdin")
+	ERRLOG("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 
 }
 
@@ -268,7 +273,7 @@ func init() {
 	if rootDir != "" {
 		if _, err := os.Stat(rootDir); err != nil {
 			if os.IsNotExist(err) {
-				Printfln("[path] <source> %s does not exist.", rootDir)
+				ERRLOG("[path] <source> %s does not exist.", rootDir)
 				os.Exit(1)
 			}
 		}
@@ -281,7 +286,7 @@ func init() {
 		} else {
 			outputDir = rootDir
 		}
-		Printfln("[path] no <destination>, creating %s", outputDir)
+		ERRLOG("[path] no <destination>, creating %s", outputDir)
 		os.MkdirAll(outputDir, 0755)
 	}
 
@@ -291,7 +296,7 @@ func main() {
 
 	if rootDir != "" {
 		if err := filepath.Walk(rootDir, visit); err != nil {
-			Printfln("[walk] %s", err)
+			ERRLOG("[walk] %s", err)
 		}
 	} else {
 		// start scanner and wait for stdin
@@ -300,12 +305,12 @@ func main() {
 
 			text := strings.Replace(scanner.Text(), "\n", "", -1)
 			if strings.HasPrefix(text, "[") {
-				Printfln("[stdin] %s", text)
+				ERRLOG("[stdin] %s", text)
 				continue
 			} else {
 				finfo, err := os.Stat(text)
 				if err != nil {
-					Printfln("[stat] %s", text)
+					ERRLOG("[stat] %s", text)
 					continue
 				}
 				visit(text, finfo, nil)
