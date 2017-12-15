@@ -1,3 +1,6 @@
+real-test
+test-output
+
 # Binaries for programs and plugins
 *.exe
 *.dll

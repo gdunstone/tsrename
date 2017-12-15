@@ -21,7 +21,7 @@ const (
 	tsForm         = "2006_01_02_15_04_05"
 	dumbExifForm   = "2006:01:02 15:04:05"
 	tsDirStruct    = "2006/2006_01/2006_01_02/2006_01_02_15/"
-	tsRegexPattern = "[0-9][0-9][0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]"
+	tsRegexPattern = "[0-9][0-9][0-9][0-9]_[0-1][0-9]_[0-3][0-9]_[0-2][0-9]_[0-5][0-9]_[0-5][0-9]"
 )
 
 var (
@@ -205,7 +205,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	}
 
 	absSrc, _ := filepath.Abs(filePath)
-	absDest, absErr := filepath.Abs(newPath)
+	absDest, _ := filepath.Abs(newPath)
 	if absSrc == absDest {
 		ERRLOG("[dupe] %s", absDest)
 		return nil
@@ -214,29 +214,26 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	err = moveOrRename(filePath, absDest)
 	jsFile := filePath + ".json"
 	if _, ferr := os.Stat(jsFile); ferr == nil {
-		jsDest, _ := filepath.Abs(newPath + ".json")
-		if e := moveOrRename(jsFile, jsDest); e != nil {
+		if e := moveOrRename(jsFile, absDest+".json"); e != nil {
 			ERRLOG("[exif] couldn't move json exif file")
 		}
 	}
-	if absErr == nil {
-		OUTPUT(absDest)
-	} else {
-		OUTPUT(newPath)
-	}
+
+	OUTPUT(newPath)
+
 	return err
 }
 
 var usage = func() {
 	ERRLOG("usage of %s:", os.Args[0])
 	ERRLOG("\tcopy into structure:")
-	ERRLOG("\t\t %s <source>", os.Args[0])
+	ERRLOG("\t\t %s -source <source>", os.Args[0])
 	ERRLOG("\tcopy into structure at <destination>:")
-	ERRLOG("\t\t %s <source> -output=<destination>", os.Args[0])
+	ERRLOG("\t\t %s -source <source> -output=<destination>", os.Args[0])
 	ERRLOG("\tcopy into structure with <name> prefix:")
-	ERRLOG("\t\t %s <source> -name=<name>", os.Args[0])
+	ERRLOG("\t\t %s -source <source> -name=<name>", os.Args[0])
 	ERRLOG("\trename (move) into structure:")
-	ERRLOG("\t\t %s <source> -del", os.Args[0])
+	ERRLOG("\t\t %s -source <source> -del", os.Args[0])
 
 	ERRLOG("")
 	ERRLOG("flags:")
@@ -257,7 +254,7 @@ func init() {
 	// set flags for flagset
 	flag.StringVar(&namedOutput, "name", "", "name for the stream")
 	flag.StringVar(&rootDir, "source", "", "source directory")
-	flag.StringVar(&outputDir, "output", "", "output directory")
+	flag.StringVar(&outputDir, "output", ".", "output directory")
 	flag.BoolVar(&del, "del", false, "delete source files")
 
 	useExif := flag.Bool("exif", false, "use exif instead of timestamps in filenames")
@@ -280,16 +277,8 @@ func init() {
 	}
 
 	// more create dirs
-	if outputDir == "" {
-		if rootDir == "" {
-			outputDir, _ = os.Getwd()
-		} else {
-			outputDir = rootDir
-		}
-		ERRLOG("[path] no <destination>, creating %s", outputDir)
-		os.MkdirAll(outputDir, 0755)
-	}
-
+	//outputDir, _ = filepath.Abs(outputDir)
+	os.MkdirAll(outputDir, 0755)
 }
 
 func main() {
